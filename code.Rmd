@@ -11,6 +11,11 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(data.table)
+theme_set(theme_light())
+install.packages("keras")
+library(keras)
+install_keras()
+library(lubridate)
 ```
 
 ## R Markdown
@@ -20,21 +25,20 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r cars}
-data <- fread("train_values.csv")
-str(data)
+data <- fread("train_values.csv", nrows = 100000)
+train_labels <- fread("train_labels.csv", nrows = 100000)
+str(train_labels)
+names(data)
 data[, n = .N, by = phase]
 data %>% 
-  count(process_id)
-
-data[process_id ==20001, ]
+  count( object_id, phase)
+data[, timestamp := ymd_hms(timestamp)]
+data[process_id %in% 20001:20011, ] %>% 
+  ggplot(aes(x = timestamp, y = return_turbidity, col = target_time_period)) + geom_line() + facet_wrap(~ process_id, scales = "free")
+  
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
+```{r}
 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
