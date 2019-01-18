@@ -33,8 +33,16 @@ data[, n = .N, by = phase]
 data %>% 
   count( object_id, phase)
 data[, timestamp := ymd_hms(timestamp)]
+data[, turbidity_ntul  := max(0, return_flow) * return_turbidity]
+data <- data[phase != 'final_rinse', ]
+
+data <- data %>% 
+  semi_join(data %>% 
+              count(process_id, phase) %>% 
+              sample_frac(0.8), by = c("process_id", "phase"))
+  
 data[process_id %in% 20001:20011, ] %>% 
-  ggplot(aes(x = timestamp, y = return_turbidity, col = target_time_period)) + geom_line() + facet_wrap(~ process_id, scales = "free")
+  ggplot(aes(x = timestamp, y = turbidity_ntul, col = target_time_period)) + geom_line() + facet_wrap(~ process_id, scales = "free")
   
 ```
 
