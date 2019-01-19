@@ -19,11 +19,6 @@ library(lubridate)
 library(caret)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r cars}
 data <- fread("train_values.csv", nrows = 1000000)
@@ -106,7 +101,7 @@ fitControl <- trainControl(method = "repeatedcv", number = 5, repeats = 3, summa
 ```
 
 
-```{r}
+```{r GBM}
 gbmGrid <-  expand.grid(interaction.depth = c(1, 5, 9), 
                         n.trees = (1:30)*50, 
                         shrinkage = 0.1,
@@ -118,18 +113,33 @@ gbm_fit <- train(
   trControl = fitControl,
   method = "gbm",
   metric = "MAPE",
-  verbose = FALSE)
+  verbose = FALSE, 
+  maximize = FALSE)
+
+
+MAPE_gen(predict(gbm_fit, newdata = test_set), test_set$final_rinse_total_turbidity_liter)
+```
+
+
+
+```{r random forest}
+rf_fit <- train(
+  final_rinse_total_turbidity_liter ~ .,
+  data = train_set,
+  trControl = fitControl,
+  method = "rf",
+  metric = "MAPE",
+  verbose = FALSE, 
+  maximize = FALSE)
+
+MAPE_gen(predict(rf_fit, newdata = test_set), test_set$final_rinse_total_turbidity_liter)
 
 ```
 
 ```{r}
-MAPE_gen(predict(gbm_fit, newdata = test_set), test_set$final_rinse_total_turbidity_liter)
 
-abs(predict(gbm_fit, newdata = test_set) - test_set$final_rinse_total_turbidity_liter)
-
-map_dbl(predict(gbm_fit, newdata = test_set), ~ max(.x, 290000))
-max(290000, abs(predict(gbm_fit, newdata = test_set) ))
 ```
+
 
 
 ```{r}
