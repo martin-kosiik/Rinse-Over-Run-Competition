@@ -21,7 +21,7 @@ library(caret)
 
 
 ```{r cars}
-data <- fread("train_values.csv", nrows = 1000000)
+data <- fread("train_values.csv")
 train_labels <- fread("train_labels.csv", nrows = 100000)
 str(train_labels)
 names(data)
@@ -55,7 +55,8 @@ data <-
   group_by(process_id, pipeline, object_id) %>% 
   select(-row_id) %>% 
   summarize_if(is.numeric, list(min = min, max = max,
-                                mean = mean, sd = sd, lambda = ~mean(.[(length(.)-5):length(.)]))) %>% 
+                                mean = mean, sd = sd,
+                                lambda = ~mean(.[ifelse(length(.)-5 < 1, length(.), length(.)-5):length(.)]))) %>% 
   ungroup() %>% 
   left_join(train_labels, by = "process_id") %>% 
   mutate(pipeline = as.factor(pipeline),
@@ -63,6 +64,8 @@ data <-
          process_id = as.factor(process_id)) %>% 
   select(-process_id)
 str(data)
+
+1:1
 ```
 
 ```{r}
@@ -123,6 +126,8 @@ MAPE_gen(predict(gbm_fit, newdata = test_set), test_set$final_rinse_total_turbid
 
 
 ```{r random forest}
+rfGrid <-  expand.grid(mtry = 85)
+
 rf_fit <- train(
   final_rinse_total_turbidity_liter ~ .,
   data = train_set,
@@ -130,7 +135,8 @@ rf_fit <- train(
   method = "rf",
   metric = "MAPE",
   verbose = FALSE, 
-  maximize = FALSE)
+  maximize = FALSE, 
+  tuneGrid = rfGrid)
 
 MAPE_gen(predict(rf_fit, newdata = test_set), test_set$final_rinse_total_turbidity_liter)
 

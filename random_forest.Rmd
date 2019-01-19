@@ -1,0 +1,111 @@
+---
+title: "submission_code"
+author: "Martin Kosík"
+date: "19 ledna 2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(data.table)
+theme_set(theme_light())
+install.packages("keras")
+library(keras)
+install_keras()
+library(lubridate)
+library(caret)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+data <- fread("train_values.csv")
+train_labels <- fread("train_labels.csv")
+submission <- fread("submission_format.csv")
+
+test_values <- fread("test_values.csv")
+
+test_values[, turbidity_ntul  := max(0, return_flow) * return_turbidity]
+data[, turbidity_ntul  := max(0, return_flow) * return_turbidity]
+data <- data[phase != 'final_rinse', ]
+
+```
+
+```{r}
+data <-
+  data %>% 
+  group_by(process_id, pipeline, object_id) %>% 
+  select(-row_id) %>% 
+  summarize_if(is.numeric, list(min = min, max = max,
+                                mean = mean, sd = sd, lambda = ~mean(.[(length(.)-5):length(.)]))) %>% 
+  ungroup() %>% 
+  left_join(train_labels, by = "process_id") %>% 
+  mutate(pipeline = as.factor(pipeline),
+         object_id =as.factor(object_id), 
+         process_id = as.factor(process_id)) %>% 
+  select(-process_id)
+```
+
+```{r}
+test_values <-
+  test_values %>% 
+  group_by(process_id, pipeline, object_id) %>% 
+  select(-row_id) %>% 
+  summarize_if(is.numeric, list(min = min, max = max,
+                                mean = mean, sd = sd, lambda = ~mean(.[(length(.)-5):length(.)]))) %>% 
+  ungroup() %>% 
+  mutate(pipeline = as.factor(pipeline),
+         object_id =as.factor(object_id))
+
+test_process_id <- test_values$process_id
+```
+
+```{r}
+fitFinal <- trainControl(method = "none", summaryFunction = MAPE)
+
+```
+
+```{r random forest}
+rfGrid <-  expand.grid(mtry = 85)
+
+rf_fit <- train(
+  final_rinse_total_turbidity_liter ~ .,
+  data = data,
+  trControl = fitFinal,
+  method = "rf",
+  metric = "MAPE",
+  verbose = FALSE, 
+  maximize = FALSE, 
+  tuneGrid = rfGrid)
+
+MAPE_gen(predict(rf_fit, newdata = test_set), test_set$final_rinse_total_turbidity_liter)
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+test_process_id <- test_values$process_id
+
+test_values$object_id <- factor(test_values$object_id, levels = levels(data$object_id))
+predict(rf, test)
+
+all(submission$process_id == test_values$process_id)
+submission$final_rinse_total_turbidity_liter <- predict(rf_fit, newdata = test_values)
+
+write_csv(submission, "submission.csv")
+
+```
+
+```{r}
+data %>% 
+  count(object_id)
+```
+
