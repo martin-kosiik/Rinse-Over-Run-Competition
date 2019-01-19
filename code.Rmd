@@ -16,6 +16,7 @@ install.packages("keras")
 library(keras)
 install_keras()
 library(lubridate)
+library(caret)
 ```
 
 ## R Markdown
@@ -25,7 +26,7 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r cars}
-data <- fread("train_values.csv", nrows = 100000)
+data <- fread("train_values.csv", nrows = 1000000)
 train_labels <- fread("train_labels.csv", nrows = 100000)
 str(train_labels)
 names(data)
@@ -36,17 +37,110 @@ data[, timestamp := ymd_hms(timestamp)]
 data[, turbidity_ntul  := max(0, return_flow) * return_turbidity]
 data <- data[phase != 'final_rinse', ]
 
-data <- data %>% 
+train <- data %>% 
   semi_join(data %>% 
               count(process_id, phase) %>% 
               sample_frac(0.8), by = c("process_id", "phase"))
-  
-data[process_id %in% 20001:20011, ] %>% 
-  ggplot(aes(x = timestamp, y = turbidity_ntul, col = target_time_period)) + geom_line() + facet_wrap(~ process_id, scales = "free")
+ 
+test <- data %>% 
+  anti_join(train, by = c("process_id", "phase")) 
+
+str(data)
   
 ```
 
 ```{r}
+data %>% 
+  count(process_id, pipeline) 
+```
 
+```{r}
+data <-
+  data %>% 
+  group_by(process_id, pipeline, object_id) %>% 
+  select(-row_id) %>% 
+  summarize_if(is.numeric, list(min = min, max = max,
+                                mean = mean, sd = sd, lambda = ~mean(.[(length(.)-5):length(.)]))) %>% 
+  ungroup() %>% 
+  left_join(train_labels, by = "process_id") %>% 
+  mutate(pipeline = as.factor(pipeline),
+         object_id =as.factor(object_id), 
+         process_id = as.factor(process_id)) %>% 
+  select(-process_id)
+str(data)
+```
+
+```{r}
+inTrain <- createDataPartition(
+  y = data$final_rinse_total_turbidity_liter,
+  p = .80,
+  list = FALSE)
+
+train_set <- data[inTrain,]
+test_set <- data[-inTrain,]
+
+```
+
+```{r}
+MAPE <- function (data, lev = NULL, model = NULL) {
+  ape <- abs(data$pred - data$obs) / map_dbl(data$pred, ~ max(.x, 290000))
+  out <- c(mean(ape))
+  names(out) <- c("MAPE")
+  out
+} 
+
+```
+
+```{r}
+MAPE_gen <- function (pred, obs) {
+  ape <- abs(pred - obs)/ map_dbl(pred, ~ max(.x, 290000))
+  out <- c(mean(ape))
+  names(out) <- c("MAPE")
+  out
+} 
+```
+
+
+```{r}
+fitControl <- trainControl(method = "repeatedcv", number = 5, repeats = 3, summaryFunction = MAPE)
+```
+
+
+```{r}
+gbmGrid <-  expand.grid(interaction.depth = c(1, 5, 9), 
+                        n.trees = (1:30)*50, 
+                        shrinkage = 0.1,
+                        n.minobsinnode = 20)
+
+gbm_fit <- train(
+  final_rinse_total_turbidity_liter ~ .,
+  data = train_set,
+  trControl = fitControl,
+  method = "gbm",
+  metric = "MAPE",
+  verbose = FALSE)
+
+```
+
+```{r}
+MAPE_gen(predict(gbm_fit, newdata = test_set), test_set$final_rinse_total_turbidity_liter)
+
+abs(predict(gbm_fit, newdata = test_set) - test_set$final_rinse_total_turbidity_liter)
+
+map_dbl(predict(gbm_fit, newdata = test_set), ~ max(.x, 290000))
+max(290000, abs(predict(gbm_fit, newdata = test_set) ))
+```
+
+
+```{r}
+data[process_id %in% 20001:20011, ] %>% 
+  ggplot(aes(x = timestamp, y = turbidity_ntul, col = target_time_period)) + geom_line() + facet_wrap(~ process_id, scales = "free")
+```
+
+```{r}
+x <- 4:10
+
+
+last(x)
 ```
 
