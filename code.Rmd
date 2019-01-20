@@ -22,7 +22,7 @@ library(caret)
 
 ```{r cars}
 data <- fread("train_values.csv")
-train_labels <- fread("train_labels.csv", nrows = 100000)
+train_labels <- fread("train_labels.csv")
 str(train_labels)
 names(data)
 data[, n = .N, by = phase]
@@ -45,8 +45,7 @@ str(data)
 ```
 
 ```{r}
-data %>% 
-  count(process_id, pipeline) 
+
 ```
 
 ```{r}
@@ -58,17 +57,24 @@ data <-
                                 mean = mean, sd = sd,
                                 lambda = ~mean(.[ifelse(length(.)-5 < 1, length(.), length(.)-5):length(.)]))) %>% 
   ungroup() %>% 
+  left_join(data %>% 
+              count(process_id, phase) %>%
+              spread(key = phase, value = n) %>% 
+              replace(is.na(.), 0), by = "process_id") %>% 
   left_join(train_labels, by = "process_id") %>% 
   mutate(pipeline = as.factor(pipeline),
          object_id =as.factor(object_id), 
          process_id = as.factor(process_id)) %>% 
   select(-process_id)
-str(data)
 
-1:1
+gc()
+fwrite(data, "data_summary.csv")
+
 ```
 
 ```{r}
+data <- fread("data_summary.csv", colClasses = c(pipeline = "factor", object_id ="factor"))
+
 inTrain <- createDataPartition(
   y = data$final_rinse_total_turbidity_liter,
   p = .80,
@@ -143,9 +149,35 @@ MAPE_gen(predict(rf_fit, newdata = test_set), test_set$final_rinse_total_turbidi
 ```
 
 ```{r}
+fitControl <- trainControl(method = "repeatedcv", number = 5, repeats = 1, summaryFunction = MAPE)
+train_set 
+
+X_train = xgb.DMatrix(as.matrix(training %>% select(-PE)))
+y_train = training$PE
+X_test = xgb.DMatrix(as.matrix(testing %>% select(-PE)))
+y_test = testing$PE
+
+xgboost_fit <- train(
+  final_rinse_total_turbidity_liter ~ .,
+  data = train_set,
+  trControl = fitControl,
+  method = "xgbTree",
+  metric = "MAPE",
+  verbose = FALSE, 
+  maximize = FALSE)
+
+ggplot(xgboost_fit)
+
+# choose subsample 1..
+
+MAPE_gen(predict(xgboost_fit, newdata = test_set), test_set$final_rinse_total_turbidity_liter)
 
 ```
+choose subsample 1.00, eta 0.3,  boosting iterations 60 and max tree depth 1
+that is 
 
+nrounds = 50, max_depth = 2, eta = 0.3, gamma = 0, colsample_bytree = 0.8, min_child_weight =
+ 1 and subsample = 1
 
 
 ```{r}

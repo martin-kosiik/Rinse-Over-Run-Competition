@@ -17,6 +17,7 @@ library(keras)
 install_keras()
 library(lubridate)
 library(caret)
+library(xgboost)
 ```
 
 ## R Markdown
@@ -61,6 +62,10 @@ test_values <-
   summarize_if(is.numeric, list(min = min, max = max,
                                 mean = mean, sd = sd, lambda = ~mean(.[(length(.)-5):length(.)]))) %>% 
   ungroup() %>% 
+  left_join(test_values %>% 
+              count(process_id, phase) %>%
+              spread(key = phase, value = n) %>% 
+              replace(is.na(.), 0), by = "process_id") %>% 
   mutate(pipeline = as.factor(pipeline),
          object_id =as.factor(object_id))
 
@@ -89,23 +94,53 @@ MAPE_gen(predict(rf_fit, newdata = test_set), test_set$final_rinse_total_turbidi
 
 ```
 
+```{r}
+xgb_Grid <-  expand.grid(nrounds = 50, max_depth = 2, eta = 0.3, gamma = 0,
+                         colsample_bytree = 0.8, min_child_weight = 1, subsample = 1)
+
+dtrain <- xgb.DMatrix(data = data[,-final_rinse_total_turbidity_lite], label=data$final_rinse_total_turbidity_liter)
+
+
+xgboost_fit <- train(
+  final_rinse_total_turbidity_liter ~ .,
+  data = data,
+  trControl = fitFinal,
+  method = "xgbTree",
+  metric = "MAPE",
+  verbose = FALSE, 
+  maximize = FALSE,
+  tuneGrid = xgb_Grid)
+
+MAPE_gen(predict(xgboost_fit, newdata = test_set), test_set$final_rinse_total_turbidity_liter)
+
+```
+
+
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 
 ```{r}
 test_process_id <- test_values$process_id
 
 test_values$object_id <- factor(test_values$object_id, levels = levels(data$object_id))
+
+test_values$object_id <- as.numeric(test_values$object_id)
 predict(rf, test)
+str(data)
 
 all(submission$process_id == test_values$process_id)
-submission$final_rinse_total_turbidity_liter <- predict(rf_fit, newdata = test_values)
+submission$final_rinse_total_turbidity_liter <- predict(xgboost_fit, newdata = test_values)
 
+class(test_values)
 write_csv(submission, "submission.csv")
+
 
 ```
 
 ```{r}
 data %>% 
   count(object_id)
+test_values %>% 
+  filter(is.na(object_id))
+
 ```
 
