@@ -87,7 +87,7 @@ test_set <- data[-inTrain,]
 
 ```{r}
 MAPE <- function (data, lev = NULL, model = NULL) {
-  ape <- abs(data$pred - data$obs) / map_dbl(data$pred, ~ max(abs(.x), 290000))
+  ape <- abs(data$pred - data$obs) / map_dbl(data$obs, ~ max(abs(.x), 290000))
   out <- c(mean(ape))
   names(out) <- c("MAPE")
   out
@@ -97,7 +97,7 @@ MAPE <- function (data, lev = NULL, model = NULL) {
 
 ```{r}
 MAPE_gen <- function (pred, obs) {
-  ape <- abs(pred - obs)/ map_dbl(pred, ~ max(abs(.x), 290000))
+  ape <- abs(pred - obs)/ map_dbl(obs, ~ max(abs(.x), 290000))
   out <- c(mean(ape))
   names(out) <- c("MAPE")
   out
