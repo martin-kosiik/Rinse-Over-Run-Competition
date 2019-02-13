@@ -32,8 +32,8 @@ train_labels <- fread("train_labels.csv")
 submission <- fread("submission_format.csv")
 
 test_values <- fread("test_values.csv")
-
 test_values[, turbidity_ntul  := max(0, return_flow) * return_turbidity]
+
 data[, turbidity_ntul  := max(0, return_flow) * return_turbidity]
 data <- data[phase != 'final_rinse', ]
 
@@ -45,7 +45,8 @@ data <-
   group_by(process_id, pipeline, object_id) %>% 
   select(-row_id) %>% 
   summarize_if(is.numeric, list(min = min, max = max,
-                                mean = mean, sd = sd, lambda = ~mean(.[(length(.)-5):length(.)]))) %>% 
+                                mean = mean, sd = sd, 
+                                lambda = ~mean(.[ifelse(length(.)-5 < 1, length(.), length(.)-5):length(.)]))) %>% 
   ungroup() %>% 
   left_join(train_labels, by = "process_id") %>% 
   mutate(pipeline = as.factor(pipeline),

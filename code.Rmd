@@ -152,7 +152,7 @@ MAPE_gen(predict(rf_fit, newdata = test_set), test_set$final_rinse_total_turbidi
 fitControl <- trainControl(method = "repeatedcv", number = 5, repeats = 1, summaryFunction = MAPE)
 train_set 
 
-xgb_Grid <-  expand.grid(nrounds = 50, max_depth = 2, eta = 0.3, gamma = 0,
+xgb_Grid <-  expand.grid(nrounds = 50, max_depth = 5, eta = 0.4, gamma = 0,
                          colsample_bytree = 0.8, min_child_weight = 1, subsample = 1)
 
 X_train = xgb.DMatrix(as.matrix(training %>% select(-PE)))
@@ -170,7 +170,7 @@ xgboost_fit <- train(
   maximize = FALSE,
   tuneGrid = xgb_Grid)
 
-ggplot(xgboost_fit)
+plot(xgboost_fit)
 
 # choose subsample 1..
 
@@ -184,10 +184,8 @@ MAPE_gen(predict(xgboost_fit, newdata = test_set), test_set$final_rinse_total_tu
 ```
 choose subsample 1.00, eta 0.3,  boosting iterations 60 and max tree depth 1
 that is 
-
-nrounds = 50, max_depth = 2, eta = 0.3, gamma = 0, colsample_bytree = 0.8, min_child_weight =
- 1 and subsample = 1
-
+nrounds = 50, max_depth = 3, eta = 0.4, gamma = 0, colsample_bytree = 0.8, min_child_weight =
+ 1 and subsample = 1.
 
 ```{r}
 data[process_id %in% 20001:20011, ] %>% 
